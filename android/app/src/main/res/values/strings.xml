@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Discorn</string>
+    <string name="title_activity_main">Discorn</string>
+    <string name="package_name">dennis.charlie.discorn</string>
+    <string name="custom_url_scheme">dennis.charlie.discorn</string>
+</resources>
