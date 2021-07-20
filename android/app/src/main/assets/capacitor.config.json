@@ -1,0 +1,8 @@
+{
+	"appId": "dennis.charlie.discorn",
+	"appName": "Discorn",
+	"bundledWebRuntime": false,
+	"npmClient": "npm",
+	"webDir": "build",
+	"cordova": {}
+}
