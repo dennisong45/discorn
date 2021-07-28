@@ -4,16 +4,18 @@ import './Bootstrap.css';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import PropTypes from 'prop-types';
 import { faMinusCircle } from '@fortawesome/free-solid-svg-icons'
-
+import {makeid,getKeyByValue} from './include_definitions'
 
 import firebase from 'firebase/app';
 import 'firebase/firestore';
 import 'firebase/auth';
+import 'firebase/database'
 
 import React, { useRef, useState } from 'react';
 import { useAuthState} from 'react-firebase-hooks/auth';
-import { useCollectionData} from 'react-firebase-hooks/firestore';
+import { useCollectionData, useDocument} from 'react-firebase-hooks/firestore';
 import { faCircle } from '@fortawesome/free-solid-svg-icons';
+import { render } from '@testing-library/react';
 
 
 if (!firebase.apps.length) {
@@ -32,6 +34,7 @@ if (!firebase.apps.length) {
 
 const auth = firebase.auth();
 const firestore = firebase.firestore();
+const database = firebase.database();
 
 
 
@@ -43,7 +46,7 @@ function App() {
   return (
     <div className="App">
       <section>
-      {user ? <DisCockChatRoom /> : <SignIn />}
+      {user ? <ChoosePeopleCover /> : <SignIn />}
       </section>
     </div>
   );
@@ -54,6 +57,7 @@ function SignIn(){
       const provider = new firebase.auth.GoogleAuthProvider();
       auth.signInWithPopup(provider);
   }
+
   return (
     <div>
     <header><h1>Welcome to Discorn</h1></header>
@@ -61,6 +65,263 @@ function SignIn(){
       <button className="btn btn-dark" onClick={signInWithGoogle}>Sign in with Google</button>
       </div>
   )
+}
+
+function ChoosePeopleCover(){
+  FirstSignIn();
+  return(
+    <div>
+    <ChoosePeople />
+    <ChannelPeople />
+    </div>
+  )
+}
+//Get the channel 
+function ChannelPeople(){
+  var channelObj = {};
+  const [peopleChannel, setPeopleChannel] = React.useState('');
+
+  const channelRef = firestore.collection('user').doc(auth.currentUser.email); //dennisongwenghan
+
+  channelObj = channelRef.get().then((channelDoc) => {
+    if(channelDoc.exists){
+      
+      channelObj = channelDoc.data().peopleWhoIInvite;
+      if(channelObj != undefined){
+        return channelObj;
+      }else{
+        return [];
+      }
+      
+    }else{
+      console.log("NOTHING");
+    } 
+  });
+
+
+  channelObj.then(
+    (result) =>{
+
+      setPeopleChannel(result);
+    },
+    (error)=>{
+      console.log(error);
+    }
+  );
+ 
+
+  return (
+    <div>
+    {Object.entries(peopleChannel).map(([id, {photoURL, email}]) => (
+      
+      <div>
+        <div>{id}</div>
+        <img src={photoURL}></img>
+        <div>{email}</div>
+      </div>
+    ))}
+    </div>
+   )
+
+}
+
+
+//TO DO LIST: SETPEOPLEX is not working due to async state, can't get out due to Promise Pending.
+function ChoosePeople(){
+  const [inviteForm,setInviteForm] = useState('');
+  const [peoplex,setPeoplex] = useState('');
+
+  const specialToken = makeid(6);
+
+  const invitePeople = async(e) =>{
+    e.preventDefault();
+
+    var inviterObj = {};
+    //Check whether i have invited this fella or not.
+    var doesThisPersonExist = true;
+    const docRef = firestore.collection('user').doc(auth.currentUser.email);
+    const inviteeeRef = firestore.collection('user').doc(inviteForm);
+
+    inviterObj =  inviteeeRef.get().then((inviteeDoc) => {
+      if(inviteeDoc.exists){
+
+        doesThisPersonExist =  true;
+        inviterObj = inviteeDoc.data().photoURL;
+        
+        if(inviterObj != undefined){
+          return inviterObj;
+        }else{
+          return [];
+        }
+
+      }else{
+        doesThisPersonExist = false;
+      }
+    });
+
+ 
+
+    //Start Logic
+    if(doesThisPersonExist == true){
+      
+      inviterObj.then(
+        (result) =>{
+          console.log(result);
+          console.log("HERERES");
+        },
+        (error)=>{
+          console.log(error);
+        }
+      );
+        
+      docRef.get().then((thisdoc) => {
+        if (thisdoc.exists) {
+            console.log("Document data:", thisdoc.data());
+          var myObj = {};
+          myObj = thisdoc.data();
+          var firstInvite;
+          var exist;
+          console.log(myObj.peopleWhoIInvite);
+          if(myObj.peopleWhoIInvite === undefined){
+            firstInvite = true;
+          }else{
+            exist = getKeyByValue(myObj.peopleWhoIInvite,inviteForm);
+            firstInvite = false;
+          }
+          console.log(firstInvite);
+          
+          //var exist = (getKeyByValue(myObj.peopleWhoIInvite,inviteForm));
+
+          //If this person does not exist on the ME->USER_INVITED
+          if(exist === undefined || firstInvite == true){
+            console.log("here");
+            const invitedRef = firestore.collection("user").doc(inviteForm).set({
+              peopleInvitedMe:{
+                [specialToken]: {
+                 email: auth.currentUser.email,
+                 photoURL: auth.currentUser.photoURL,
+                },
+
+              },
+              
+            },{merge:true});
+        
+            const inviterRef = firestore.collection("user").doc( auth.currentUser.email).set({
+              peopleWhoIInvite:{
+                [specialToken]: {
+                  email: inviteForm,
+                  photoURL: peoplex,
+                 },
+              },
+            },{merge:true});
+          }else{
+            console.log("already exist!");
+          }
+          
+
+        } else {
+            // doc.data() will be undefined in this case
+            console.log("No such document!");
+        }
+    }).catch((error) => {
+        console.log("Error getting document:", error);
+    });
+
+    }
+
+
+    /*
+
+
+    */
+    //console.log(myRef);
+    //var newKey = myRef.push().key();
+
+    /*
+    const userRef = firestore.collection("user").doc(inviteForm).update({
+      people: {
+        [randomID]: auth.currentUser.email
+      }
+    },{ merge: true });
+    */
+    /*
+    const userRef = firestore.collection("userstest").doc(auth.currentUser.email).collection("random_channeL_id").doc().set({
+      owner: auth.currentUser.email,
+      invitee: inviteForm,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    })
+    */
+
+    
+    /*
+    const userRef = firestore.collection("users").doc(auth.currentUser.email).collection("random_channel_id").doc().set({
+      text: 'formValue',
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    */
+ 
+  }
+
+  return(
+    <div>
+      <SignOut />
+      <h2>  {auth.currentUser.email} </h2>
+
+      <h3>Choose People</h3>
+
+      <div className="input-group mb-3">
+      <form onSubmit={invitePeople}>
+      <input value={inviteForm} onChange={(e) => setInviteForm(e.target.value)} type="text" className="form-control" placeholder="Recipient's username" aria-label="Recipient's username" aria-describedby="button-addon2"/>
+      <button className="btn btn-outline-secondary" type="button" id="button-addon2" type="submit"  disabled={!inviteForm}>Invite</button>
+      </form>
+
+      </div>
+    </div>
+
+  )
+}
+
+function FirstSignIn(){
+  var docRef = firestore.collection("user").doc(auth.currentUser.email);
+
+  docRef.get().then((doc) => {
+    if (doc.exists) {
+     // console.log("Document data:", doc.data());
+    } else {
+      const userRef = firestore.collection("user").doc(auth.currentUser.email).set({
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        photoURL: auth.currentUser.photoURL,
+      });
+      console.log("No such document!");
+    }
+  }).catch((error) => {
+  console.log("Error getting document:", error);
+  });
+}
+
+
+
+function PeopleRender(){
+
+
+
+  const usersRef = firestore.collection(auth.currentUser.email).doc('people');
+
+  console.log("here");
+
+  usersRef.get().then((doc) => {
+      if (doc.exists) {
+          console.log("Document data:", doc.data());
+      } else {
+          // doc.data() will be undefined in this case
+          console.log("No such document!");
+      }
+  }).catch((error) => {
+      console.log("Error getting document:", error);
+  });
+
+
+
 }
 
 function SignOut(){
@@ -86,6 +347,8 @@ function getData(){
   });
 
 }
+
+//Chat System Below
 
 function DisCockChatRoom(){
   const dummy = useRef();
@@ -118,7 +381,7 @@ function DisCockChatRoom(){
      {messages && messages.map(msg => <DisCockChatMsg key={msg.id} message={msg} />)}
      <span ref={dummy}></span>
    <form onSubmit={sendMessage}>
-    <input value={formValue}onChange={(e) => setFormValue(e.target.value)} placeholder="say something nice" />
+    <input value={formValue} onChange={(e) => setFormValue(e.target.value)} placeholder="say something nice" />
      <button type="submit"  disabled={!formValue} > 🍆 </button>
    </form>
    </div>
